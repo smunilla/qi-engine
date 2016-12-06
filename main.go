@@ -3,11 +3,31 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"text/template"
+
+	"io/ioutil"
 
 	"gopkg.in/yaml.v2"
 )
 
 func main() {
+	configFilePath := os.Args[1]
+	content, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(-1)
+	}
+	data := string(content)
+
+	config := readConfig(data)
+	//dumpConfig(config)
+
+	inventoryTemplate.Execute(os.Stdout, config)
+
+}
+
+func readConfig(data string) Config {
 	config := Config{}
 
 	err := yaml.Unmarshal([]byte(data), &config)
@@ -15,13 +35,25 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
+	return config
+}
+
+func dumpConfig(config Config) {
 	d, err := yaml.Marshal(&config)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
 	fmt.Printf("--- config dump:\n%s\n\n", string(d))
+}
 
+func isInList(roles []string, role string) bool {
+	for _, v := range roles {
+		if v == role {
+			return true
+		}
+	}
+	return false
 }
 
 /*
@@ -58,7 +90,7 @@ Deployment List of any Hosts and Roles
 */
 type Deployment struct {
 	Hosts []Host
-	Roles Role
+	Roles Role `yaml:"roles"`
 	Vars  map[string]string
 }
 
@@ -120,7 +152,7 @@ func (h *Host) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		}
 	}
 
-	keysToDel := []string{"connect_to", "hostname", "public_hostname", "ip", "public_ip"}
+	keysToDel := []string{"connect_to", "hostname", "public_hostname", "ip", "public_ip", "node_labels"}
 	for _, v := range keysToDel {
 		delete(variables, v)
 	}
@@ -134,8 +166,6 @@ func (h *Host) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	h.Roles = params.Roles
 	h.Vars = variables
 
-	fmt.Printf("%s\n", variables)
-
 	return nil
 }
 
@@ -144,44 +174,36 @@ Role A map of variables to be applied to a group of Hosts
 */
 type Role map[string](map[string]string)
 
-var data = `
-ansible_callback_facts_yaml: /home/smunilla/.config/openshift/.ansible/callback_facts.yaml
-ansible_config: /usr/share/atomic-openshift-utils/ansible.cfg
-ansible_inventory_path: /home/smunilla/.config/openshift/hosts
-ansible_log_path: /tmp/ansible.log
-deployment:
-  ansible_ssh_user: openshift
-  hosts:
-  - connect_to: 192.168.55.233
-    hostname: armory-master-91c03.example.com
-    ip: 192.168.55.233
-    node_labels: '{''region'': ''infra''}'
-    public_hostname: armory-master-91c03.example.com
-    public_ip: 192.168.55.233
-    foo: "bar"
-    bar: false
-    roles:
-    - master
-    - etcd
-    - node
-    - storage
-  - connect_to: 192.168.55.8
-    hostname: armory-node-compute-a4330.example.com
-    ip: 192.168.55.8
-    public_hostname: armory-node-compute-a4330.example.com
-    public_ip: 192.168.55.8
-    roles:
-    - node
-  master_routingconfig_subdomain: ''
-  proxy_exclude_hosts: ''
-  proxy_http: ''
-  proxy_https: ''
-  roles:
-    etcd: {}
-    master: {}
-    node: {}
-    storage: {}
-variant: openshift-enterprise
-variant_version: '3.3'
-version: v2
+var (
+	templateGroup = template.New("")
+	inventoryText = `
+[OSEv3:children]
+{{range $k, $v := .Deployment.Roles}}{{$k}}
+{{end}}
+
+[OSEv3:vars]
+{{range $k, $v := .Deployment.Vars}}{{$k}}={{$v}}
+{{end}}
+
+{{$hosts := .Deployment.Hosts -}}
+{{$roles := .Deployment.Roles -}}
+{{range $role_name, $role_vars := $roles}}[{{$role_name}}]
+  {{- range $hosts -}}
+    {{- if IsInList .Roles $role_name -}} 
+      {{- template "host" . -}} {{range $rk, $rv := $role_vars}}{{$rk}}={{$rv}}{{end -}}
+    {{- end -}}
+{{end}}
+
+{{end -}}
 `
+	hostText = `
+{{.ConnectTo}} {{if .IP}}openshift_ip={{.IP}}{{end -}} 
+               {{- if .PublicIP}} openshift_public_ip={{.PublicIP}} {{end -}}
+			   {{- if .Hostname}}openshift_hostname={{.Hostname}} {{end -}}
+			   {{- if .PublicHostname}}openshift_public_hostname={{.PublicHostname}} {{end -}}
+			   {{- range $k, $v := .Vars}}{{$k}}={{$v}} {{end -}}
+`
+	inventoryTemplate = template.Must(templateGroup.New("config").Funcs(template.FuncMap{
+		"IsInList": isInList}).Parse(inventoryText))
+	hostTemplate = template.Must(templateGroup.New("host").Parse(hostText))
+)

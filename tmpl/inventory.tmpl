@@ -1,0 +1,35 @@
+{/*
+
+Example of final target:
+
+[OSEv3:children]
+nodes
+masters
+nfs
+etcd
+new_nodes
+
+[OSEv3:vars]
+ansible_ssh_user=openshift
+ansible_become=yes
+deployment_type=openshift-enterprise
+
+[nodes]
+192.168.55.233  openshift_ip=192.168.55.233 openshift_public_ip=192.168.55.233 openshift_hostname=armory-master-91c03.example.com openshift_public_hostname=armory-master-91c03.example.com openshift_node_labels="{'region': 'infra'}" openshift_schedulable=False
+192.168.55.8  openshift_ip=192.168.55.8 openshift_public_ip=192.168.55.8 openshift_hostname=armory-node-compute-a4330.example.com openshift_public_hostname=armory-node-compute-a4330.example.com openshift_schedulable=True
+
+[masters]
+192.168.55.233  openshift_ip=192.168.55.233 openshift_public_ip=192.168.55.233 openshift_hostname=armory-master-91c03.example.com openshift_public_hostname=armory-master-91c03.example.com
+
+[nfs]
+192.168.55.233  openshift_ip=192.168.55.233 openshift_public_ip=192.168.55.233 openshift_hostname=armory-master-91c03.example.com openshift_public_hostname=armory-master-91c03.example.com
+
+[etcd]
+192.168.55.233  openshift_ip=192.168.55.233 openshift_public_ip=192.168.55.233 openshift_hostname=armory-master-91c03.example.com openshift_public_hostname=armory-master-91c03.example.com
+
+[new_nodes]
+192.168.55.8  openshift_ip=192.168.55.8 openshift_public_ip=192.168.55.8 openshift_hostname=armory-node-compute-a4330.example.com openshift_public_hostname=armory-node-compute-a4330.example.com
+*/}
+
+[OSEv3:children] 
+{{range .Child}}{{.}}\n{{end}}
