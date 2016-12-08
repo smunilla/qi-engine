@@ -1,22 +1,27 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"text/template"
-
-	"io/ioutil"
 
 	"gopkg.in/yaml.v2"
 )
 
 func main() {
-	configFilePath := os.Args[1]
+	flag.Parse()
+
+	if flag.NArg() != 1 {
+		log.Fatal("please provide a file!")
+	}
+
+	configFilePath := flag.Args()[0]
 	content, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(-1)
 	}
 	data := string(content)
 
