@@ -203,7 +203,42 @@ var (
 			   {{- if .PublicHostname}}openshift_public_hostname={{.PublicHostname}} {{end -}}
 			   {{- range $k, $v := .Vars}}{{$k}}={{$v}} {{end -}}
 `
+	dynamicInventoryText = `
+{
+{{- $deployment_vars := .Deployment.Vars -}}
+{{- $hosts := .Deployment.Hosts -}}
+{{- $roles := .Deployment.Roles -}}
+{{range $role_name, $role_vars := $roles}}
+  "{{$role_name}}":
+    "hosts": [
+    {{- range $hosts -}}
+      {{- if IsInList .Roles $role_name}} 
+        "{{ .ConnectTo -}}",
+      {{- end -}}
+	{{ end }}
+    ],
+    "vars": [
+	{{- range $k, $v := $deployment_vars}}
+	  "{{$k}}": "{{$v}}",
+	{{- end -}}
+    {{ range $rk, $rv := $role_vars }}
+	  "{{ $rk -}}": "{{- $rv -}}",
+	{{- end}}
+    ]
+{{end}}
+  "_meta": {
+    "hostvars": {
+      {{ range $hosts -}}
+      "{{ .ConnectTo }}": {
+		  {{ range $k, $v := .Vars}}
+            "{{$k}}": "{{ $v }}",
+		  {{- end }}
+      }
+      {{ end -}}    
+  }
+}
+`
 	inventoryTemplate = template.Must(templateGroup.New("config").Funcs(template.FuncMap{
-		"IsInList": isInList}).Parse(inventoryText))
+		"IsInList": isInList}).Parse(dynamicInventoryText))
 	hostTemplate = template.Must(templateGroup.New("host").Parse(hostText))
 )
